@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pump Sessions Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pump Sessions Tracker</h1>
+            <div class="current-date" id="currentDate"></div>
+        </header>
+
+        <section class="today-section">
+            <div class="section-header">
+                <h2>Today's Sessions</h2>
+                <div class="total-display" id="todayTotal">Total: 0 ml</div>
+            </div>
+            <div class="table-container">
+                <table id="todayTable">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Amount (ml)</th>
+                            <th>Power Pump</th>
+                        </tr>
+                    </thead>
+                    <tbody id="todayTableBody">
+                        <!-- Table rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+                <div id="noDataMessage" class="no-data-message">No data for today</div>
+            </div>
+        </section>
+
+        <section class="weekly-section">
+            <div class="section-header">
+                <h2>Week's Trend</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </section>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
