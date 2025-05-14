@@ -242,11 +242,19 @@ function prepareWeeklyData(parsedData) {
             item.date >= currentDate && item.date < nextDate
         );
         
-        // Calculate total amount for the day
-        const totalAmount = dayData.reduce((sum, item) => sum + item.amount, 0);
+        // Split data into morning (before noon) and afternoon (after noon)
+        const morningData = dayData.filter(item => item.date.getHours() < 12);
+        const afternoonData = dayData.filter(item => item.date.getHours() >= 12);
+        
+        // Calculate total amounts for morning and afternoon
+        const morningAmount = morningData.reduce((sum, item) => sum + item.amount, 0);
+        const afternoonAmount = afternoonData.reduce((sum, item) => sum + item.amount, 0);
+        const totalAmount = morningAmount + afternoonAmount;
         
         weeklyData.push({
             date: currentDate,
+            morningAmount: morningAmount,
+            afternoonAmount: afternoonAmount,
             totalAmount: totalAmount
         });
     }
@@ -254,7 +262,7 @@ function prepareWeeklyData(parsedData) {
     return weeklyData;
 }
 
-// Draw the weekly trend chart
+// Draw the weekly trend chart as a stacked bar chart
 function drawWeeklyChart(weeklyData) {
     const canvas = document.getElementById('weeklyChart');
     const ctx = canvas.getContext('2d');
@@ -306,25 +314,63 @@ function drawWeeklyChart(weeklyData) {
         ctx.fillText(`${labelValue}`, padding.left - 5, y + 3);
     }
     
-    // Draw bars
+    // Draw stacked bars
     weeklyData.forEach((item, index) => {
         const x = padding.left + (chartWidth / weeklyData.length * index) + barSpacing / 2;
-        const barHeight = item.totalAmount * yScale;
-        const y = padding.top + chartHeight - barHeight;
         
-        // Draw bar
-        ctx.fillStyle = '#e84393';
-        ctx.fillRect(x, y, barWidth, barHeight);
+        // Draw afternoon portion (top of stack)
+        const afternoonHeight = item.afternoonAmount * yScale;
+        const morningHeight = item.morningAmount * yScale;
         
-        // Draw total amount on top of the bar
-        ctx.fillStyle = '#b83b7c';
-        ctx.font = '12px "Segoe UI"';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${item.totalAmount}`, x + barWidth / 2, y - 5);
+        // Morning portion starts at the bottom
+        const morningY = padding.top + chartHeight - morningHeight;
+        
+        // Afternoon portion starts where morning ends
+        const afternoonY = morningY - afternoonHeight;
+        
+        // Draw morning bar (bottom segment)
+        ctx.fillStyle = '#e84393'; // Original pink color for morning
+        ctx.fillRect(x, morningY, barWidth, morningHeight);
+        
+        // Draw afternoon bar (top segment)
+        ctx.fillStyle = '#9b59b6'; // Purple color for afternoon
+        ctx.fillRect(x, afternoonY, barWidth, afternoonHeight);
+        
+        // Draw total amount on top of the stacked bar
+        if (item.totalAmount > 0) {
+            ctx.fillStyle = '#333';
+            ctx.font = '12px "Segoe UI"';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${item.totalAmount}`, x + barWidth / 2, afternoonY - 5);
+        }
         
         // Draw date label on x-axis
         ctx.fillStyle = '#7f8c8d';
         ctx.font = '10px "Segoe UI"';
         ctx.fillText(formatChartDate(item.date), x + barWidth / 2, padding.top + chartHeight + 15);
     });
+    
+    // Draw legend
+    drawLegend(ctx, canvas.width, padding.top);
+}
+
+// Function to draw chart legend
+function drawLegend(ctx, canvasWidth, topPadding) {
+    const legendX = canvasWidth - 150;
+    const legendY = topPadding - 15;
+    const boxSize = 10;
+    
+    // Morning legend item
+    ctx.fillStyle = '#e84393';
+    ctx.fillRect(legendX, legendY, boxSize, boxSize);
+    ctx.fillStyle = '#333';
+    ctx.font = '10px "Segoe UI"';
+    ctx.textAlign = 'left';
+    ctx.fillText('Morning (AM)', legendX + boxSize + 5, legendY + boxSize - 1);
+    
+    // Afternoon legend item
+    ctx.fillStyle = '#9b59b6';
+    ctx.fillRect(legendX, legendY + 15, boxSize, boxSize);
+    ctx.fillStyle = '#333';
+    ctx.fillText('Afternoon (PM)', legendX + boxSize + 5, legendY + 15 + boxSize - 1);
 }
