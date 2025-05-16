@@ -179,6 +179,10 @@ function processData(data) {
     // Prepare and display weekly chart
     const weeklyData = prepareWeeklyData(parsedData);
     drawWeeklyChart(weeklyData);
+    
+    // Prepare and display bubble chart
+    const bubbleData = prepareBubbleData(parsedData);
+    drawBubbleChart(bubbleData);
 }
 
 // Update the today's table with filtered data
@@ -254,6 +258,56 @@ function prepareWeeklyData(parsedData) {
     return weeklyData;
 }
 
+// Prepare data for bubble chart
+function prepareBubbleData(parsedData) {
+    const bubbleData = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Get data for the last 7 days
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    
+    // Filter data for the last 7 days
+    const lastSevenDaysData = parsedData.filter(item => item.date >= sevenDaysAgo);
+    
+    // Prepare data for bubble chart
+    lastSevenDaysData.forEach(item => {
+        const hours = item.date.getHours() + item.date.getMinutes() / 60; // Convert to decimal hours
+        
+        // Determine color based on time of day
+        let color;
+        if (hours >= 0 && hours < 4) {
+            color = "#2E86C1"; // Deep blue
+        } else if (hours >= 4 && hours < 8) {
+            color = "#3498DB"; // Light blue
+        } else if (hours >= 8 && hours < 12) {
+            color = "#F1C40F"; // Yellow
+        } else if (hours >= 12 && hours < 16) {
+            color = "#E67E22"; // Orange
+        } else if (hours >= 16 && hours < 20) {
+            color = "#CB4335"; // Red
+        } else {
+            color = "#884EA0"; // Purple
+        }
+        
+        // Create date without time for y-axis
+        const dateOnly = new Date(item.date);
+        dateOnly.setHours(0, 0, 0, 0);
+        
+        bubbleData.push({
+            x: hours,           // Time of day (decimal hours)
+            y: dateOnly,        // Date
+            r: Math.sqrt(item.amount) * 1.2, // Size proportional to volume (increased by 50%)
+            color: color,       // Color based on time of day
+            amount: item.amount, // Original amount for labels
+            time: `${String(item.date.getHours()).padStart(2, '0')}:${String(item.date.getMinutes()).padStart(2, '0')}` // Time for tooltip
+        });
+    });
+    
+    return bubbleData;
+}
+
 // Draw the weekly trend chart
 function drawWeeklyChart(weeklyData) {
     const canvas = document.getElementById('weeklyChart');
@@ -326,5 +380,180 @@ function drawWeeklyChart(weeklyData) {
         ctx.fillStyle = '#7f8c8d';
         ctx.font = '10px "Segoe UI"';
         ctx.fillText(formatChartDate(item.date), x + barWidth / 2, padding.top + chartHeight + 15);
+    });
+}
+
+// Draw the bubble chart
+function drawBubbleChart(bubbleData) {
+    const canvas = document.getElementById('bubbleChart');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size to container size for responsiveness
+    const container = canvas.parentElement;
+    canvas.width = container.offsetWidth;
+    canvas.height = container.offsetHeight;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Chart dimensions and padding
+    const padding = {
+        top: 30,
+        right: 20,
+        bottom: 40,
+        left: 60
+    };
+    
+    const chartWidth = canvas.width - padding.left - padding.right;
+    const chartHeight = canvas.height - padding.top - padding.bottom;
+    
+    // Get unique dates for y-axis
+    const uniqueDates = Array.from(new Set(bubbleData.map(item => item.y.getTime())))
+        .map(time => new Date(time))
+        .sort((a, b) => a - b); // Sort dates from oldest to newest
+    
+    // X-axis scale (0-24 hours)
+    const xScale = chartWidth / 24;
+    
+    // Y-axis scale (dates)
+    const yScale = chartHeight / (uniqueDates.length || 1); // Avoid division by zero
+    
+    // Draw grid and axes
+    ctx.beginPath();
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 1;
+    
+    // Vertical grid lines (every 4 hours)
+    for (let hour = 0; hour <= 24; hour += 4) {
+        const x = padding.left + (hour * xScale);
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, padding.top + chartHeight);
+        ctx.stroke();
+        
+        // X-axis labels
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = '10px "Segoe UI"';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${hour}:00`, x, padding.top + chartHeight + 15);
+    }
+    
+    // Horizontal grid lines (for each date)
+    uniqueDates.forEach((date, index) => {
+        const y = padding.top + (index * yScale) + (yScale / 2);
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + chartWidth, y);
+        ctx.stroke();
+        
+        // Y-axis date labels
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = '10px "Segoe UI"';
+        ctx.textAlign = 'right';
+        ctx.fillText(formatChartDate(date), padding.left - 5, y + 3);
+    });
+    
+    // Store bubble coordinates for tooltip
+    const bubbleCoordinates = [];
+    
+    // Draw bubbles
+    bubbleData.forEach(item => {
+        // Find the index of the date in our uniqueDates array
+        const dateIndex = uniqueDates.findIndex(date => 
+            date.getDate() === item.y.getDate() && 
+            date.getMonth() === item.y.getMonth() && 
+            date.getFullYear() === item.y.getFullYear()
+        );
+        
+        const x = padding.left + (item.x * xScale);
+        const y = padding.top + (dateIndex * yScale) + (yScale / 2);
+        const radius = Math.max(item.r, 5); // Minimum radius of 5 for visibility
+        
+        // Draw bubble
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = item.color;
+        ctx.fill();
+        
+        // Add amount text inside bubble if bubble is large enough
+        if (radius > 12) {
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 10px "Segoe UI"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.amount, x, y);
+        }
+        
+        // Store coordinates for tooltip
+        bubbleCoordinates.push({
+            x: x,
+            y: y,
+            radius: radius,
+            amount: item.amount,
+            time: item.time
+        });
+    });
+    
+    // Remove existing tooltip if any
+    const existingTooltip = document.getElementById('bubbleChartTooltip');
+    if (existingTooltip) {
+        existingTooltip.remove();
+    }
+    
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.id = 'bubbleChartTooltip';
+    tooltip.style.cssText = `
+        position: fixed;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 9999;
+        display: none;
+        pointer-events: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        font-family: 'Segoe UI', sans-serif;
+    `;
+    document.body.appendChild(tooltip);
+    
+    // Add mouse move event to canvas
+    canvas.addEventListener('mousemove', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        // Check if mouse is over any bubble
+        let isOverBubble = false;
+        
+        for (const bubble of bubbleCoordinates) {
+            const distance = Math.sqrt(
+                Math.pow(mouseX - bubble.x, 2) + 
+                Math.pow(mouseY - bubble.y, 2)
+            );
+            
+            if (distance <= bubble.radius) {
+                isOverBubble = true;
+                
+                // Update tooltip content
+                tooltip.innerHTML = `Time: ${bubble.time}<br>Amount: ${bubble.amount} ml`;
+                
+                // Position tooltip near cursor but ensure it's visible
+                tooltip.style.left = `${event.clientX + 15}px`;
+                tooltip.style.top = `${event.clientY - 15}px`;
+                tooltip.style.display = 'block';
+                
+                // Once we found a bubble, we can break the loop
+                break;
+            }
+        }
+        
+        if (!isOverBubble) {
+            tooltip.style.display = 'none';
+        }
+    });
+    
+    // Hide tooltip when mouse leaves canvas
+    canvas.addEventListener('mouseout', () => {
+        tooltip.style.display = 'none';
     });
 }
